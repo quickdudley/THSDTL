@@ -22,7 +22,7 @@ allSame (a:r@(b:_))
   | a == b = allSame r
   | otherwise = False
 
-learnDT :: forall a b t. (Ord b,Ord t,Eq t) =>
+learnDT :: forall a b t. (Ord b,Eq b,Ord t,Eq t) =>
  (t -> ExpQ) -> [(M.Map b Name -> ExpQ, a -> b)] -> [(a,t)] -> ExpQ
 learnDT lq cr dp = do
   (rn,(_,lm)) <- runStateT (dtn (zip [0..] cr) dp) (M.empty, M.empty)
@@ -31,7 +31,7 @@ learnDT lq cr dp = do
   letE (map return lb) (varE rn)
 -- _ $ dtn (zip [0..] cr) dp
  where
-  dtn :: (Ord b,Ord t,Eq t) =>
+  dtn :: (Ord b,Eq b,Ord t,Eq t) =>
     [(Int,(M.Map b Name -> ExpQ, a -> b))] -> [(a,t)] ->
     StateT
       (
@@ -43,7 +43,8 @@ learnDT lq cr dp = do
   dtn _ [] = fail "learnDT called with no training examples"
   dtn [] l = let
     t = fst $ maximumBy (compare `on` snd) $
-      M.fromListWith (+) $ map (flip (,) 1 . snd) l
+      M.toList $
+      M.fromListWith (+) $ map (\(_,t) -> (t,1)) l
     in do
       (ncache,ecache) <- get
       case M.lookup (Left t) ncache of
@@ -62,9 +63,11 @@ learnDT lq cr dp = do
           map (\d'@(a,_) -> (cdf a,(d' :))) d
         in ((bm,c1,cr1),entr bm)
        ) $
-      select c
-    in if allSame (map snd d)
-      then do
+      select fc
+    fc = filter (\(_,(_,lf)) -> not $ allSame $ map (lf . fst) d) c
+    in case () of
+      () | null fc -> dtn [] d
+      () | allSame (map snd d) -> do
         let t = snd $ head d
         (ncache,ecache) <- get
         case M.lookup (Left t) ncache of
@@ -73,7 +76,7 @@ learnDT lq cr dp = do
             n <- lift (newName "dtl")
             put (M.insert (Left t) n ncache, M.insert n (lq t) ecache)
             return n
-      else do
+      () | otherwise -> do
         m <- fmap M.fromList $ forM (M.toList nx) $ \(k,d') -> do
           bn <- dtn cr' d'
           return (k,bn)
