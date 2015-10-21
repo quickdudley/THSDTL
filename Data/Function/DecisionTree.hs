@@ -41,6 +41,17 @@ learnDT lq cr dp = do
       Q
       Name
   dtn _ [] = fail "learnDT called with no training examples"
+  dtn [] l = let
+    t = fst $ maximumBy (compare `on` snd) $
+      M.fromListWith (+) $ map (flip (,) 1 . snd) l
+    in do
+      (ncache,ecache) <- get
+      case M.lookup (Left t) ncache of
+        Just n -> return n
+        Nothing -> do
+          n <- lift (newName "dtl")
+          put (M.insert (Left t) n ncache, M.insert n (lq t) ecache)
+          return n
   dtn c d = let
     l = genericLength d
     entr m = sum $
