@@ -57,7 +57,7 @@ learnDT lq cr dp = do
     l = genericLength d
     entr m = sum $
       map (\e -> genericLength e / l * entropy (map snd e)) $ M.elems m
-    ((nx,c',cr'),_) = maximumBy (compare `on` snd) $
+    ((nx,c',cr'),_) = minimumBy (compare `on` snd) $
       map (\(c1@(_,(_,cdf)),cr1) -> let
         bm = M.map ($ []) $ M.fromListWith (.) $
           map (\d'@(a,_) -> (cdf a,(d' :))) d
